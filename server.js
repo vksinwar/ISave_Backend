@@ -13,7 +13,7 @@ const app = express();
 // CORS configuration for production
 const corsOptions = {
     origin: process.env.NODE_ENV === 'production' 
-        ? ['https://your-frontend-domain.com'] // Add your frontend domains
+        ? [process.env.API_URL || 'https://your-api-domain.onrender.com'] // Use environment variable
         : '*',
     methods: ['GET', 'POST'],
     allowedHeaders: ['Content-Type']
@@ -27,6 +27,18 @@ app.use(express.json());
 // Swagger setup
 const specs = swaggerJsdoc({
     definition: {
+        openapi: '3.0.0',
+        info: {
+            title: 'Video Downloader API',
+            version: '1.0.0',
+            description: 'API for downloading videos from YouTube and Instagram',
+            contact: {
+                name: 'API Support',
+                url: process.env.NODE_ENV === 'production'
+                    ? 'https://your-api-domain.onrender.com'
+                    : 'http://localhost:3000',
+            },
+        },
         servers: [
             {
                 url: process.env.NODE_ENV === 'production'
@@ -35,8 +47,59 @@ const specs = swaggerJsdoc({
                 description: process.env.NODE_ENV === 'production' ? 'Production server' : 'Development server',
             },
         ],
-        // ... rest of swagger config
-    }
+        components: {
+            schemas: {
+                VideoResponse: {
+                    type: 'object',
+                    properties: {
+                        success: {
+                            type: 'boolean',
+                            description: 'Operation success status'
+                        },
+                        platform: {
+                            type: 'string',
+                            enum: ['youtube', 'instagram'],
+                            description: 'Video platform'
+                        },
+                        title: {
+                            type: 'string',
+                            description: 'Video title'
+                        },
+                        thumbnail: {
+                            type: 'string',
+                            description: 'Thumbnail URL'
+                        },
+                        duration: {
+                            type: 'string',
+                            description: 'Video duration in seconds'
+                        },
+                        author: {
+                            type: 'string',
+                            description: 'Content creator name'
+                        },
+                        download_url: {
+                            type: 'string',
+                            description: 'Direct download URL'
+                        }
+                    }
+                },
+                Error: {
+                    type: 'object',
+                    properties: {
+                        success: {
+                            type: 'boolean',
+                            default: false
+                        },
+                        error: {
+                            type: 'string',
+                            description: 'Error message'
+                        }
+                    }
+                }
+            }
+        }
+    },
+    apis: ['./server.js'],
 });
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs));
 
