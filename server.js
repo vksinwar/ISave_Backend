@@ -13,10 +13,11 @@ const app = express();
 // CORS configuration for production
 const corsOptions = {
     origin: process.env.NODE_ENV === 'production' 
-        ? [process.env.API_URL || 'https://your-api-domain.onrender.com'] // Use environment variable
+        ? ['https://instasave.world', 'https://www.instasave.world']
         : '*',
     methods: ['GET', 'POST'],
-    allowedHeaders: ['Content-Type']
+    allowedHeaders: ['Content-Type'],
+    credentials: true
 };
 
 app.use(cors(corsOptions));

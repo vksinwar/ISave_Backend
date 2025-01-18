@@ -10,4 +10,4 @@ services:
       - key: PORT
         value: 10000
       - key: API_URL
-        value: https://your-api-domain.onrender.com 
+        value: https://isave-backend-sjwi.onrender.com 
