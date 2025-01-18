@@ -202,16 +202,33 @@ app.get('/api/video', limiter, async (req, res) => {
                         error: 'Invalid YouTube URL' 
                     });
                 }
-                const info = await ytdl.getInfo(url);
-                videoInfo = {
-                    success: true,
-                    platform: 'youtube',
-                    title: info.videoDetails.title,
-                    thumbnail: info.videoDetails.thumbnails[0].url,
-                    duration: info.videoDetails.lengthSeconds,
-                    author: info.videoDetails.author.name,
-                    download_url: await getYouTubeDownloadUrl(url, info)
-                };
+                try {
+                    const info = await ytdl.getInfo(url, {
+                        requestOptions: {
+                            headers: {
+                                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                                'Accept': '*/*',
+                                'Accept-Language': 'en-US,en;q=0.9',
+                                'Cookie': 'CONSENT=YES+; Path=/',
+                            }
+                        }
+                    });
+                    
+                    videoInfo = {
+                        success: true,
+                        platform: 'youtube',
+                        title: info.videoDetails.title,
+                        thumbnail: info.videoDetails.thumbnails[0].url,
+                        duration: info.videoDetails.lengthSeconds,
+                        author: info.videoDetails.author.name,
+                        download_url: await getYouTubeDownloadUrl(url, info)
+                    };
+                } catch (error) {
+                    return res.status(400).json({
+                        success: false,
+                        error: 'Unable to process YouTube video. ' + error.message
+                    });
+                }
                 break;
 
             case 'instagram':
@@ -262,21 +279,49 @@ function detectPlatform(url) {
 
 // Helper function to get YouTube download URL
 async function getYouTubeDownloadUrl(url, info) {
-    const format = ytdl.chooseFormat(info.formats, { 
-        quality: 'highest',
-        filter: 'videoandaudio'
-    });
-    return format.url;
+    try {
+        const format = ytdl.chooseFormat(info.formats, { 
+            quality: 'highest',
+            filter: 'videoandaudio'
+        });
+
+        // Add required headers for YouTube requests
+        const requestOptions = {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': '*/*',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Connection': 'keep-alive',
+                'Cookie': 'CONSENT=YES+; Path=/',  // Basic consent cookie
+                'Sec-Fetch-Dest': 'empty',
+                'Sec-Fetch-Mode': 'cors',
+                'Sec-Fetch-Site': 'same-origin',
+            }
+        };
+
+        // Add these options to ytdl
+        return ytdl(url, {
+            format: format,
+            requestOptions: requestOptions
+        }).on('error', (err) => {
+            console.error('YouTube download error:', err);
+            throw err;
+        });
+    } catch (error) {
+        console.error('Error getting YouTube URL:', error);
+        throw new Error('Unable to process YouTube video. Please try again later.');
+    }
 }
 
 // Error handling middleware (Move these to the end)
 app.use((err, req, res, next) => {
-    console.error(err.stack);
-    res.status(500).json({
-        success: false,
-        error: 'Internal Server Error',
-        message: process.env.NODE_ENV === 'development' ? err.message : undefined
-    });
+    if (err.message.includes('Sign in to confirm')) {
+        return res.status(403).json({
+            success: false,
+            error: 'This video requires age verification. Please try another video.'
+        });
+    }
+    next(err);
 });
 
 // 404 handler (This should be the last route)
