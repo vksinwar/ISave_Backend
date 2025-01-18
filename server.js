@@ -10,19 +10,35 @@ import swaggerJsdoc from 'swagger-jsdoc';
 
 const app = express();
 
-// CORS configuration for production
-const corsOptions = {
-    origin: process.env.NODE_ENV === 'production' 
-        ? ['https://instasave.world', 'https://www.instasave.world']
-        : '*',
-    methods: ['GET', 'POST'],
-    allowedHeaders: ['Content-Type'],
+// Define allowed origins
+const allowedOrigins = process.env.NODE_ENV === 'production'
+    ? ['https://instasave.world', 'https://www.instasave.world', 'http://localhost:3000']
+    : ['http://localhost:3000'];
+
+// Simple CORS configuration
+app.use(cors({
+    origin: function (origin, callback) {
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin) return callback(null, true);
+        
+        if (allowedOrigins.indexOf(origin) === -1) {
+            return callback(new Error('CORS policy violation'), false);
+        }
+        return callback(null, true);
+    },
+    methods: ['GET', 'POST', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Origin', 'Accept'],
     credentials: true
-};
+}));
 
-app.use(cors(corsOptions));
+// Add basic security headers
+app.use((req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-XSS-Protection', '1; mode=block');
+    next();
+});
 
-// Middleware
+// Rest of your middleware
 app.use(express.json());
 
 // Swagger setup
@@ -270,14 +286,6 @@ app.use((req, res) => {
         error: 'Not Found',
         message: 'The requested resource does not exist'
     });
-});
-
-// Add security headers
-app.use((req, res, next) => {
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('X-Frame-Options', 'DENY');
-    res.setHeader('X-XSS-Protection', '1; mode=block');
-    next();
 });
 
 // Start server
