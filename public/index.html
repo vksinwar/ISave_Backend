@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Downloader</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .container {
+            text-align: center;
+        }
+        input[type="text"] {
+            width: 80%;
+            padding: 10px;
+            margin: 10px 0;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        #status {
+            margin-top: 20px;
+        }
+        .platform-select {
+            margin: 10px 0;
+            padding: 10px;
+            width: 200px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Video Downloader</h1>
+        <select id="platform" class="platform-select">
+            <option value="youtube">YouTube</option>
+            <option value="instagram">Instagram</option>
+        </select>
+        <input type="text" id="videoUrl" placeholder="Enter video URL">
+        <button onclick="downloadVideo()">Download</button>
+        <div id="status"></div>
+    </div>
+
+    <script>
+        async function downloadVideo() {
+            const url = document.getElementById('videoUrl').value;
+            const platform = document.getElementById('platform').value;
+            const status = document.getElementById('status');
+            
+            if (!url) {
+                status.textContent = 'Please enter a URL';
+                return;
+            }
+
+            status.textContent = 'Downloading...';
+            
+            try {
+                window.location.href = `/download/${platform}?url=${encodeURIComponent(url)}`;
+                status.textContent = 'Download started!';
+            } catch (error) {
+                status.textContent = 'Error downloading video';
+                console.error('Error:', error);
+            }
+        }
+    </script>
+</body>
+</html> 
