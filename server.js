@@ -366,24 +366,49 @@ async function getYouTubeDownloadUrl(url, info) {
     }
 }
 
-// Error handling middleware (Move these to the end)
+// Update error handling middleware
 app.use((err, req, res, next) => {
+    logger.error(err);
+    
+    // Ensure we're sending JSON response
+    res.setHeader('Content-Type', 'application/json');
+    
     if (err.message.includes('Sign in to confirm')) {
         return res.status(403).json({
             success: false,
             error: 'This video requires age verification. Please try another video.'
         });
     }
-    next(err);
+    
+    // Generic error response
+    res.status(500).json({
+        success: false,
+        error: process.env.NODE_ENV === 'production' 
+            ? 'An unexpected error occurred' 
+            : err.message
+    });
 });
 
-// 404 handler (This should be the last route)
+// Update 404 handler
 app.use((req, res) => {
+    res.setHeader('Content-Type', 'application/json');
     res.status(404).json({
         success: false,
         error: 'Not Found',
         message: 'The requested resource does not exist'
     });
+});
+
+// Add general error handler for uncaught exceptions
+process.on('uncaughtException', (err) => {
+    logger.error('Uncaught Exception:', err);
+    // Ensure clean shutdown if needed
+    process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
+    // Handle the error appropriately
 });
 
 // Self-ping mechanism to prevent idle timeout
