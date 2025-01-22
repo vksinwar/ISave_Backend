@@ -222,12 +222,12 @@ app.get('/', (req, res) => {
  */
 app.get('/api/video', limiter, async (req, res) => {
     try {
-        const { url } = req.query;
+        const { url, platform } = req.query;
         
-        if (!url) {
+        if (!url || !platform) {
             return res.status(400).json({
                 success: false,
-                error: 'URL is required'
+                error: 'URL and platform are required'
             });
         }
 
@@ -237,14 +237,6 @@ app.get('/api/video', limiter, async (req, res) => {
         if (cachedData) {
             logger.info({ url, source: 'cache' }, 'Cache hit');
             return res.json(cachedData);
-        }
-
-        const platform = detectPlatform(url);
-        if (!platform) {
-            return res.status(400).json({
-                success: false,
-                error: 'Unsupported platform. Please provide a valid YouTube or Instagram URL'
-            });
         }
 
         let videoInfo;
@@ -320,6 +312,11 @@ app.get('/api/video', limiter, async (req, res) => {
                     });
                 }
                 break;
+            default:
+                return res.status(400).json({
+                    success: false,
+                    error: 'Unsupported platform'
+                });
         }
 
         res.json(videoInfo);
@@ -332,24 +329,6 @@ app.get('/api/video', limiter, async (req, res) => {
         });
     }
 });
-
-// Helper function to detect platform
-function detectPlatform(url) {
-    try {
-        const urlObj = new URL(url);
-        const hostname = urlObj.hostname.toLowerCase();
-
-        if (hostname.includes('youtube.com') || hostname.includes('youtu.be')) {
-            return 'youtube';
-        }
-        if (hostname.includes('instagram.com')) {
-            return 'instagram';
-        }
-        return null;
-    } catch {
-        return null;
-    }
-}
 
 // Helper function to get YouTube download URL
 async function getYouTubeDownloadUrl(url, info) {
