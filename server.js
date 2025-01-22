@@ -8,8 +8,34 @@ import { rateLimit } from 'express-rate-limit';
 import swaggerUi from 'swagger-ui-express';
 import swaggerJsdoc from 'swagger-jsdoc';
 import fetch from 'node-fetch';
+import NodeCache from 'node-cache';
+import compression from 'compression';
+import pino from 'pino';
+
+// Initialize cache and logger
+const cache = new NodeCache({ stdTTL: 3600 }); // 1 hour cache
+const logger = pino();
 
 const app = express();
+
+// Add compression early in the middleware chain
+app.use(compression());
+
+// Add performance monitoring middleware
+app.use((req, res, next) => {
+    req.startTime = Date.now();
+    res.on('finish', () => {
+        const duration = Date.now() - req.startTime;
+        logger.info({
+            method: req.method,
+            url: req.url,
+            duration,
+            status: res.statusCode,
+            memory: process.memoryUsage().heapUsed
+        });
+    });
+    next();
+});
 
 // Define allowed origins
 const allowedOrigins = process.env.NODE_ENV === 'production'
@@ -205,6 +231,14 @@ app.get('/api/video', limiter, async (req, res) => {
             });
         }
 
+        // Try cache first
+        const cacheKey = `video_${url}`;
+        const cachedData = cache.get(cacheKey);
+        if (cachedData) {
+            logger.info({ url, source: 'cache' }, 'Cache hit');
+            return res.json(cachedData);
+        }
+
         const platform = detectPlatform(url);
         if (!platform) {
             return res.status(400).json({
@@ -244,7 +278,13 @@ app.get('/api/video', limiter, async (req, res) => {
                         author: info.videoDetails.author.name,
                         download_url: await getYouTubeDownloadUrl(url, info)
                     };
+
+                    // Cache the result
+                    cache.set(cacheKey, videoInfo);
+                    logger.info({ url, source: 'api' }, 'Cache miss, fetched from API');
+
                 } catch (error) {
+                    logger.error({ url, error: error.message }, 'YouTube processing error');
                     return res.status(400).json({
                         success: false,
                         error: 'Unable to process YouTube video. ' + error.message
@@ -253,26 +293,39 @@ app.get('/api/video', limiter, async (req, res) => {
                 break;
 
             case 'instagram':
-                const igResponse = await instagramGetUrl(url);
-                if (igResponse.url_list.length === 0) {
+                try {
+                    const igResponse = await instagramGetUrl(url);
+                    if (igResponse.url_list.length === 0) {
+                        return res.status(400).json({
+                            success: false,
+                            error: 'No downloadable URL found'
+                        });
+                    }
+                    videoInfo = {
+                        success: true,
+                        platform: 'instagram',
+                        download_url: igResponse.url_list[0],
+                        type: igResponse.type
+                    };
+
+                    // Cache the result
+                    cache.set(cacheKey, videoInfo);
+                    logger.info({ url, source: 'api' }, 'Cache miss, fetched from API');
+
+                } catch (error) {
+                    logger.error({ url, error: error.message }, 'Instagram processing error');
                     return res.status(400).json({
                         success: false,
-                        error: 'No downloadable URL found'
+                        error: 'Unable to process Instagram video. ' + error.message
                     });
                 }
-                videoInfo = {
-                    success: true,
-                    platform: 'instagram',
-                    download_url: igResponse.url_list[0],
-                    type: igResponse.type
-                };
                 break;
         }
 
         res.json(videoInfo);
 
     } catch (error) {
-        console.error('Video processing error:', error);
+        logger.error({ error: error.message }, 'General error in video endpoint');
         res.status(500).json({
             success: false,
             error: error.message

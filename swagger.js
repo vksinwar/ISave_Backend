@@ -66,6 +66,15 @@ export const swaggerOptions = {
                         }
                     }
                 }
+            },
+            headers: {
+                'X-Cache': {
+                    description: 'Indicates if the response was served from cache',
+                    schema: {
+                        type: 'string',
+                        enum: ['HIT', 'MISS']
+                    }
+                }
             }
         }
     },
