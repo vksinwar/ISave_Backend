@@ -10,4 +10,9 @@ services:
       - key: PORT
         value: 10000
       - key: API_URL
-        value: https://isave-backend-sjwi.onrender.com 
+        value: https://isave-backend-sjwi.onrender.com
+    autoDeploy: true
+    healthCheckPath: /ping
+    numInstances: 1
+    sleepPreventionEnabled: true
+ 

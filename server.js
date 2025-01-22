@@ -7,6 +7,7 @@ import { dirname } from 'path';
 import { rateLimit } from 'express-rate-limit';
 import swaggerUi from 'swagger-ui-express';
 import swaggerJsdoc from 'swagger-jsdoc';
+import fetch from 'node-fetch';
 
 const app = express();
 
@@ -132,7 +133,26 @@ const limiter = rateLimit({
     legacyHeaders: false,
 });
 
-// Root route (Move this to the top of routes)
+/**
+ * @swagger
+ * /ping:
+ *   get:
+ *     summary: Health check endpoint
+ *     tags: [Health]
+ *     responses:
+ *       200:
+ *         description: API is up and running
+ *         content:
+ *           text/plain:
+ *             schema:
+ *               type: string
+ *               example: pong
+ */
+app.get('/ping', (req, res) => {
+    res.send('pong');
+});
+
+// Root route
 app.get('/', (req, res) => {
     res.json({
         success: true,
@@ -140,6 +160,7 @@ app.get('/', (req, res) => {
         version: '1.0.0',
         description: 'API for downloading videos from YouTube and Instagram',
         endpoints: {
+            health: '/ping',
             documentation: '/api-docs',
             video: '/api/video?url=VIDEO_URL'
         }
@@ -333,8 +354,31 @@ app.use((req, res) => {
     });
 });
 
+// Self-ping mechanism to prevent idle timeout
+function setupPingService() {
+    const PING_INTERVAL = 14 * 60 * 1000; // 14 minutes
+    const url = process.env.NODE_ENV === 'production' 
+        ? 'https://isave-backend-sjwi.onrender.com/ping'
+        : `http://localhost:${process.env.PORT || 3000}/ping`;
+
+    setInterval(async () => {
+        try {
+            const response = await fetch(url);
+            console.log(`Ping status: ${response.status === 200 ? 'OK' : 'Failed'}`);
+        } catch (error) {
+            console.error('Ping failed:', error.message);
+        }
+    }, PING_INTERVAL);
+}
+
 // Start server
 const port = process.env.PORT || 3000;
 app.listen(port, '0.0.0.0', () => {
     console.log(`API Server running on port ${port}`);
+    
+    // Start ping service in production
+    if (process.env.NODE_ENV === 'production') {
+        setupPingService();
+        console.log('Ping service started');
+    }
 }); 
